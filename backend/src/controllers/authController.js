@@ -1,17 +1,17 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import User from "../models/User.js";
-import {userSchema} from "../validators/validators.js";
+import {userSchema, userLogin} from "../validators/validators.js";
 import { generateToken } from "../utils/generateToken.js";
 
 export const registerUser = async(req, res) => {
     try {
-        const {email, username} = req.body.email;
+        const {email, username} = req.body;
         const isExist = await User.findOne({email});
         if(isExist){
             return res.status(400).json({error: "Email has been used"});
         }
-        const notUnique = await User.findOne({username}).select("+password");
+        const notUnique = await User.findOne({username});
         if(notUnique){
             return res.status(400).json({error: "Username has been used"});
         }
@@ -41,11 +41,11 @@ export const registerUser = async(req, res) => {
 export const loginUser = async(req, res) => {
     try {
         const {email, password} = req.body;
-        const user = await User.findOne({email});
+        const user = await User.findOne({email}).select("+password");
         if(!user){
             return res.status(400).json({error: "User not found"});
         }
-        const validate = userSchema.safeParse(req.body);
+        const validate = userLogin.safeParse(req.body);
         if(!validate.success){
             return res.status(400).json({error: validate.error.issues});
         }
@@ -63,6 +63,28 @@ export const loginUser = async(req, res) => {
         });
 
         res.status(200).json({msg: "User logged in successfully"});
+    } catch (error) {
+        res.status(500).json({error: error.message});
+    }
+}
+
+export const logoutUser = async(req, res) => {
+    res.cookie("token", "", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "None",
+        expires: new Date(0)
+    });
+    res.status(200).json({msg: "Logged out successfully"});
+}
+
+export const getMe = async(req, res) => {
+    try {
+        const user = await User.findById(req.user.user_id);
+        if(!user){
+            return res.status(404).json({error: "User not found"});
+        }
+        res.status(200).json({user});
     } catch (error) {
         res.status(500).json({error: error.message});
     }

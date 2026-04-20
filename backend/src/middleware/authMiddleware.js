@@ -8,7 +8,7 @@ export const protect = async(req, res, next) => {
             return res.status(400).json({error: "Unauthorized"});
         }
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded.user_id;
+        req.user = decoded;
         next();
     } catch (error) {
         res.status(500).json({error: error.message});
