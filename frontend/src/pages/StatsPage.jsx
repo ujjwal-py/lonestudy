@@ -6,6 +6,7 @@ const StatsPage = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [expandedCard, setExpandedCard] = useState(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -36,31 +37,47 @@ const StatsPage = () => {
 
   const StatCard = ({ title, icon, data, type }) => {
     const a = accents[type];
+    const isExpanded = expandedCard === type;
+    const toggleExpanded = () => {
+      setExpandedCard((prev) => (prev === type ? null : type));
+    };
+
     return (
-      <div className={`glass rounded-2xl p-6 border-t-2 ${a.border} hover:-translate-y-0.5 hover:border-white/[0.2] hover:shadow-lg transition-all duration-250`} id={`stat-${type}`}>
+      <div className={`glass-panel border-t-2 rounded-2xl p-6 ${a.border} hover:-translate-y-0.5 transition-all duration-250`} id={`stat-${type}`}>
         <div className="flex items-center gap-2 mb-3">
           <span className={`text-xl ${a.icon}`}>{icon}</span>
-          <h3 className="text-sm font-semibold text-text-dim">{title}</h3>
+          <h3 className="text-sm font-semibold theme-text-primary">{title}</h3>
         </div>
-        <div className="text-4xl font-extrabold mb-1">{data?.total_completed || 0}</div>
-        <p className="text-xs text-text-muted mb-4">tasks completed</p>
+        <div className="text-4xl font-extrabold mb-1 theme-text-primary">{data?.total_completed || 0}</div>
+        <p className="text-xs theme-text-secondary mb-4">tasks completed</p>
         
-        <div className="text-2xl font-bold mb-1 text-accent-light">{formatTime(data?.total_time || 0)}</div>
-        <p className="text-[10px] text-text-muted mb-4 uppercase tracking-wider">total time studied</p>
+        <div className="text-2xl font-bold mb-1 theme-text-primary">{formatTime(data?.total_time || 0)}</div>
+        <p className="text-[10px] theme-text-soft mb-4 uppercase tracking-wider">total time studied</p>
 
         {data?.tasks_completed?.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {data.tasks_completed.map((task, i) => (
-              <span key={i} className="text-[11px] px-2 py-0.5 text-text-dim bg-white/[0.04] border border-white/[0.1] rounded-full">
-                {typeof task === 'object' ? task.title : 'Task'}
-              </span>
-            ))}
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={toggleExpanded}
+              className="glass-ghost text-xs px-3 py-2 rounded-lg transition-all"
+            >
+              {isExpanded ? 'Hide completed tasks' : `See completed tasks (${data.tasks_completed.length})`}
+            </button>
+            {isExpanded && (
+              <div className="mt-3 space-y-2">
+                {data.tasks_completed.map((task, i) => (
+                  <div key={task._id || i} className="px-3 py-2 text-xs theme-text-secondary glass-ghost rounded-lg">
+                    {typeof task === 'object' ? task.title : 'Task'}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {data?.daily_breakdown?.length > 1 && (
-          <div className="pt-4 border-t border-white/[0.1]">
-            <h4 className="text-[10px] text-text-muted uppercase tracking-wider mb-3">Daily Breakdown</h4>
+          <div className="pt-4 border-t surface-divider">
+            <h4 className="text-[10px] theme-text-soft uppercase tracking-wider mb-3 pt-4">Daily Breakdown</h4>
             <div className="flex items-end gap-2 h-20">
               {data.daily_breakdown.map((day, i) => {
                 const max = Math.max(...data.daily_breakdown.map((d) => d.total_completed), 1);
@@ -74,7 +91,7 @@ const StatsPage = () => {
                     >
                       <span className="text-[9px] font-semibold text-white mt-0.5">{day.total_completed}</span>
                     </div>
-                    <span className="text-[9px] text-text-muted mt-1">{label}</span>
+                    <span className="text-[9px] theme-text-soft mt-1">{label}</span>
                   </div>
                 );
               })}
@@ -88,18 +105,18 @@ const StatsPage = () => {
   const isEmpty = stats && stats.today?.total_completed === 0 && stats.week?.total_completed === 0 && stats.month?.total_completed === 0;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-bg to-bg/50">
+    <div className="app-shell flex flex-col">
       <Navbar />
       <main className="flex-1 py-8 px-6 max-w-[1200px] w-full mx-auto" id="stats-page">
         {/* Header */}
         <div className="text-center mb-8 animate-fade-up">
-          <h1 className="text-3xl font-bold gradient-text mb-1">Your Progress</h1>
-          <p className="text-sm text-text-dim">Track your study achievements</p>
+          <h1 className="text-3xl font-bold theme-text-primary mb-1">Your Progress</h1>
+          <p className="text-sm theme-text-secondary">Track your study achievements</p>
         </div>
 
         {/* Loading */}
         {loading && (
-          <div className="flex flex-col items-center justify-center py-20 gap-4 text-text-dim">
+          <div className="flex flex-col items-center justify-center py-20 gap-4 theme-text-secondary">
             <div className="w-9 h-9 border-3 border-border-subtle border-t-accent rounded-full animate-spin-slow" />
             <p className="text-sm">Loading stats...</p>
           </div>
@@ -112,7 +129,7 @@ const StatsPage = () => {
 
         {/* Stats Grid */}
         {stats && !isEmpty && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 animate-fade-up [animation-delay:100ms]">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-start animate-fade-up [animation-delay:100ms]">
             <StatCard title="Today" icon="☀" data={stats.today} type="today" />
             <StatCard title="This Week" icon="◧" data={stats.week} type="week" />
             <StatCard title="This Month" icon="☽" data={stats.month} type="month" />
@@ -121,9 +138,9 @@ const StatsPage = () => {
 
         {/* Empty State */}
         {isEmpty && (
-          <div className="text-center py-16 text-text-muted animate-fade-up [animation-delay:200ms]">
-            <div className="text-5xl mb-4 text-border-medium">◑</div>
-            <h3 className="text-lg text-text-dim mb-1.5">No stats yet</h3>
+          <div className="text-center py-16 theme-text-soft animate-fade-up [animation-delay:200ms]">
+            <div className="text-5xl mb-4 opacity-50">◑</div>
+            <h3 className="text-lg theme-text-secondary mb-1.5">No stats yet</h3>
             <p className="text-sm">Complete some tasks to see your progress here!</p>
           </div>
         )}

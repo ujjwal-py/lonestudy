@@ -20,5 +20,6 @@ export const taskSchema = z.object({
     cycles_required: z.number().min(1),
     cycles_completed: z.number().min(0),
     time_elapsed: z.number().min(0),
-    status: z.enum(["pending", "completed"])
+    status: z.enum(["pending", "completed"]),
+    deleted: z.boolean()
 })

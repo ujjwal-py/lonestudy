@@ -14,7 +14,7 @@ function App() {
     return (
       <div className="loading-screen">
         <div className="loading-spinner" />
-        <p>Loading SoloStudy...</p>
+        <p>Loading loneStudy...</p>
       </div>
     );
   }

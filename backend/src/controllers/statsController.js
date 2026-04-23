@@ -23,8 +23,11 @@ export const getStats = async (req, res) => {
         const user_id = req.user.user_id;
         const now = new Date();
 
-        // Get all completed tasks for this user (excluding deleted)
-        const completedTasks = await Task.find({ user_id, status: 'completed', deleted: { $ne: true } });
+        // Completed tasks should remain in stats even after soft delete.
+        const completedTasks = await Task.find({
+            user_id,
+            status: 'completed'
+        });
 
         // Define date ranges
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -34,9 +37,13 @@ export const getStats = async (req, res) => {
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         monthStart.setHours(0, 0, 0, 0);
 
-        // Filter tasks by completion date (using updatedAt field)
+        // Use the actual completion timestamp, not updatedAt, so soft delete
+        // does not move historical stats into a different day/week/month.
         const filterByDateRange = (tasks, startDate, endDate) => 
-            tasks.filter(task => task.updatedAt >= startDate && task.updatedAt <= endDate);
+            tasks.filter(task => {
+                const completedOn = task.completedAt || task.updatedAt;
+                return completedOn >= startDate && completedOn <= endDate;
+            });
 
         const todayTasks = filterByDateRange(completedTasks, todayStart, now);
         const weekTasks = filterByDateRange(completedTasks, weekStart, now);

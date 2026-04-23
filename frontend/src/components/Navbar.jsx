@@ -1,8 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const location = useLocation();
 
   const handleLogout = async () => {
@@ -12,16 +14,16 @@ const Navbar = () => {
   const linkClass = (path) =>
     `flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-150 ${
       location.pathname === path
-        ? 'text-accent bg-accent/10 border border-accent/30'
-        : 'text-text-dim hover:text-white hover:bg-white/[0.08]'
+        ? 'theme-text-primary glass-ghost'
+        : 'theme-text-secondary hover:bg-white/10 hover:text-[var(--text-primary)]'
     }`;
 
   return (
-    <nav className="flex items-center justify-between px-6 h-[60px] bg-white/[0.05] border-b border-white/[0.1] backdrop-blur-xl sticky top-0 z-50">
+    <nav className="flex items-center justify-between px-6 h-[60px] glass-panel sticky top-0 z-50 border-b surface-divider shadow-lg">
       {/* Brand */}
-      <Link to="/" className="flex items-center gap-2 text-lg font-bold text-white hover:text-white">
-        <span className="text-accent text-xl">◈</span>
-        <span>SoloStudy</span>
+      <Link to="/" className="flex items-center gap-2 text-lg font-bold theme-text-primary">
+        <span className="surface-accent text-xl">◈</span>
+        <span>loneStudy</span>
       </Link>
 
       {/* Links */}
@@ -39,15 +41,22 @@ const Navbar = () => {
 
       {/* User */}
       <div className="flex items-center gap-3">
-        <span className="hidden sm:flex items-center gap-2 text-sm text-text-dim">
-          <span className="flex items-center justify-center w-7 h-7 text-xs font-semibold bg-gradient-to-br from-accent to-indigo-500 text-white rounded-full">
+        <button
+          onClick={toggleTheme}
+          className="theme-toggle px-3 py-1.5 text-sm rounded-lg transition-all duration-150 hover:-translate-y-0.5"
+          id="theme-toggle"
+        >
+          {isDark ? 'Light' : 'Dark'}
+        </button>
+        <span className="hidden sm:flex items-center gap-2 text-sm theme-text-secondary">
+          <span className="flex items-center justify-center w-7 h-7 text-xs font-semibold glass-button rounded-full">
             {user?.name?.charAt(0).toUpperCase()}
           </span>
           {user?.name}
         </span>
         <button
           onClick={handleLogout}
-          className="px-3 py-1.5 text-sm text-text-dim border border-white/[0.1] rounded-lg hover:bg-white/[0.08] hover:text-white transition-all duration-150"
+          className="glass-ghost px-3 py-1.5 text-sm rounded-lg transition-all duration-150"
           id="logout-btn"
         >
           Logout

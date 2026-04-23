@@ -37,17 +37,17 @@ const DashboardPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-bg to-bg/50">
+    <div className="app-shell flex flex-col">
       <Navbar />
       <main className="flex-1 p-5 max-w-[1400px] w-full mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 items-start animate-fade-up">
           {/* Pending Tasks */}
-          <div className="glass rounded-2xl overflow-hidden max-h-[calc(100vh-100px)] overflow-y-auto">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.1]">
-              <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-                <span className="text-accent">☰</span> Pending Tasks
+          <div className="glass-panel rounded-2xl overflow-hidden max-h-[calc(100vh-100px)] overflow-y-auto transition-all duration-300">
+            <div className="flex items-center justify-between px-5 py-4 border-b surface-divider">
+              <h2 className="flex items-center gap-2 text-[15px] font-semibold theme-text-primary">
+                <span>☰</span> Pending Tasks
               </h2>
-              <span className="text-xs font-semibold px-2 py-1 bg-accent/10 text-accent rounded-full">
+              <span className="status-pill text-xs font-semibold px-2 py-1 rounded-full">
                 {tasks.length}
               </span>
             </div>
@@ -55,27 +55,27 @@ const DashboardPage = () => {
             <div className="px-5 py-3">
               <div className="flex flex-col gap-2">
                 {tasks.length === 0 && (
-                  <p className="text-center text-xs text-text-muted py-6">No pending tasks. Create one!</p>
+                  <p className="text-center text-xs theme-text-soft py-6">No pending tasks. Create one!</p>
                 )}
                 {tasks.map((task) => (
                   <div
                     key={task._id}
                     className={`p-3 rounded-xl border transition-all duration-150 cursor-pointer ${
                       selectedTask?._id === task._id
-                        ? 'bg-accent/10 border-accent/30 shadow-[0_0_20px_rgba(139,92,246,0.1)]'
-                        : 'bg-white/[0.04] border-white/[0.1] hover:border-white/[0.2] hover:bg-white/[0.06]'
+                        ? 'bg-white/14 border-white/20 shadow-md backdrop-blur-md'
+                        : 'bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/10 backdrop-blur-sm'
                     }`}
                     onClick={() => setSelectedTask(selectedTask?._id === task._id ? null : task)}
                     id={`task-${task._id}`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <h4 className="text-sm font-semibold truncate flex-1 min-w-0">{task.title}</h4>
-                      <div className="flex gap-2 shrink-0 text-xs text-text-muted">
+                      <h4 className="text-sm font-semibold truncate flex-1 min-w-0 theme-text-primary">{task.title}</h4>
+                      <div className="flex gap-2 shrink-0 text-xs theme-text-secondary">
                         <span>⟳ {task.cycles_completed}/{task.cycles_required}</span>
                         <span>⏱ {formatTime(task.time_elapsed)}</span>
                       </div>
                     </div>
-                    <p className="text-xs text-text-dim line-clamp-1">{task.description}</p>
+                    <p className="text-xs theme-text-soft line-clamp-1">{task.description}</p>
                   </div>
                 ))}
               </div>

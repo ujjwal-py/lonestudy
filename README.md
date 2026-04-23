@@ -1,15 +1,16 @@
 # LoneStudy - Pomodoro Study Tracker
 
-A full-stack web application for productivity and study tracking with integrated Pomodoro timer, task management, note-taking, and detailed statistics.
+A full-stack study tracker with task management, a Pomodoro timer, notes, soft-delete task history, and time-based stats.
 
 ## Features
 
 ### 🎯 Core Features
 - **Task Management** - Create, update, and track study tasks
-- **Pomodoro Timer** - 25-minute focus sessions with 5-minute breaks
+- **Pomodoro Timer** - Choose 25-minute or 50-minute focus cycles with matched breaks (5 or 10 minutes)
 - **Notes Section** - Quick note-taking during study sessions
 - **Statistics Tracking** - View completed tasks and time spent by day, week, and month
 - **Soft Delete** - Deleted tasks remain in database for historical data preservation
+- **Theme Toggle** - Dark glass default with light mode toggle
 
 ### 🔐 Authentication
 - User registration and login with JWT tokens
@@ -19,7 +20,7 @@ A full-stack web application for productivity and study tracking with integrated
 ### 📊 Stats & Analytics
 - Daily, weekly, and monthly task completion stats
 - Total time studied tracking
-- Task breakdown and completion history
+- Expandable completed-task history
 - Real-time stats updates
 
 ## Tech Stack
@@ -86,7 +87,8 @@ solostudy/
 │   │   │   ├── TasksPage.jsx
 │   │   │   └── StatsPage.jsx
 │   │   ├── context/
-│   │   │   └── AuthContext.jsx
+│   │   │   ├── AuthContext.jsx
+│   │   │   └── ThemeContext.jsx
 │   │   ├── api/
 │   │   │   └── api.js
 │   │   ├── App.jsx
@@ -161,7 +163,7 @@ Frontend runs on `http://localhost:5173`
 
 1. **Register** - Create a new account with email and password
 2. **Login** - Sign in with your credentials
-3. **Dashboard** - View pending tasks and start Pomodoro sessions
+3. **Dashboard** - View pending tasks, pick a task, and run 25/50 minute focus cycles
 4. **Tasks Page** - Create new tasks and view completion stats
 5. **Stats Page** - Track your progress with detailed analytics
 
@@ -169,16 +171,16 @@ Frontend runs on `http://localhost:5173`
 
 1. Create a task with title, description, and target cycles
 2. Select a task from the pending list
-3. Start the Pomodoro timer (1 minute for testing, 25 minutes in production)
+3. Start the Pomodoro timer with either a 25-minute or 50-minute focus cycle
 4. Work during the focus session
-5. Take a break when timer completes
+5. Take the auto-matched break when the timer completes
 6. Track your progress in the Stats page
 
 ### Features Breakdown
 
 **Dashboard**
 - Quick view of pending tasks
-- Active Pomodoro timer
+- Active Pomodoro timer with selectable focus duration
 - Notes section for jotting down ideas
 
 **Tasks Page**
@@ -192,7 +194,8 @@ Frontend runs on `http://localhost:5173`
 - Weekly progress tracking
 - Monthly achievements
 - Total time studied
-- Completed tasks list with timestamps
+- Expandable completed task lists
+- Soft-deleted completed tasks still count toward stats
 
 ## API Endpoints
 
@@ -207,21 +210,12 @@ Frontend runs on `http://localhost:5173`
 - `POST /api/task/create` - Create new task
 - `PUT /api/task/update/:id` - Update task
 - `DELETE /api/task/delete/:id` - Soft delete task
-- `PUT /api/task/update-time` - Update task elapsed time
+- `PUT /api/task/update-time` - Increment task elapsed time
 - `PUT /api/task/addCycle` - Increment completed cycles
 
 ### Stats
 - `GET /api/stats` - Get stats for today, week, month
 - `POST /api/stats/update` - Update stats
-
-## Testing
-
-Pomodoro timer is set to **1 minute** for testing purposes. Change in `frontend/src/components/PomodoroTimer.jsx`:
-
-```javascript
-const POMODORO_MINUTES = 1;  // Change to 25 for production
-const BREAK_MINUTES = 1;     // Change to 5 for production
-```
 
 ## Database Models
 
@@ -235,6 +229,7 @@ const BREAK_MINUTES = 1;     // Change to 5 for production
 - Status (pending/completed)
 - Cycles required/completed
 - Time elapsed (seconds)
+- Completion timestamp
 - User reference
 - Soft delete flag
 - Created/updated timestamps
@@ -256,12 +251,14 @@ Tasks are never permanently deleted. Instead:
 - Historical data preserved for stats
 
 ### Time Tracking
-- Pomodoro timer accumulates elapsed time in seconds
-- API endpoint `update-time` updates task time
-- Stats aggregates total time from all completed tasks
+- Pomodoro focus time is stored in seconds per task
+- Time is added on pause and on completed focus cycles
+- Break time is not added to task totals
+- Reset does not save in-progress focus time
 
 ### Stats Calculation
-- Backend queries completed tasks by `updatedAt` field
+- Backend tracks completion history using a dedicated completion timestamp
+- Soft-deleted completed tasks are still included in stats
 - Filters by date ranges (today, week, month)
 - Aggregates time and task counts
 - Returns task details for display
@@ -271,12 +268,11 @@ Tasks are never permanently deleted. Instead:
 - Uses JWT for stateless authentication
 - CORS enabled for frontend-backend communication
 - Mongoose soft-delete pattern for data preservation
-- Tailwind CSS with glass morphism theme
+- Dark/light glass theme with persisted toggle
 - Auto-refresh stats on task completion
 
 ## Future Enhancements
 
-- Dark/light theme toggle
 - Task categories and priorities
 - Pomodoro session history
 - Export stats as PDF
@@ -291,4 +287,4 @@ ISC
 
 ## Author
 
-SoloStudy Development Team
+loneStudy Development Team

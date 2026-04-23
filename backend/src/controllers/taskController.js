@@ -37,7 +37,22 @@ export const updateTask = async (req, res) => {
         if (!validate.success) {
             return res.status(400).json({ error: validate.error.issues });
         }
-        const task = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
+        const existingTask = await Task.findOne({ _id: req.params.id, user_id: req.user.user_id });
+        if (!existingTask) {
+            return res.status(404).json({ error: "Task not found" });
+        }
+
+        const updateData = { ...req.body };
+
+        if (existingTask.status !== "completed" && req.body.status === "completed") {
+            updateData.completedAt = new Date();
+        }
+
+        if (req.body.status !== "completed" && existingTask.status === "completed") {
+            updateData.completedAt = null;
+        }
+
+        const task = await Task.findByIdAndUpdate(req.params.id, updateData, { new: true });
         res.status(200).json({ task });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -46,7 +61,14 @@ export const updateTask = async (req, res) => {
 
 export const deleteTask = async (req, res) => {
     try {
-        const task = await Task.findByIdAndUpdate(req.params.id, { deleted: true }, { new: true });
+        const task = await Task.findOneAndUpdate(
+            { _id: req.params.id, user_id: req.user.user_id },
+            { deleted: true },
+            { new: true }
+        );
+        if (!task) {
+            return res.status(404).json({ error: "Task not found" });
+        }
         res.status(200).json({ task });
     } catch (error) {
         res.status(500).json({ error: error.message });
