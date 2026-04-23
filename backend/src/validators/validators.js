@@ -23,3 +23,6 @@ export const taskSchema = z.object({
     status: z.enum(["pending", "completed"]),
     deleted: z.boolean()
 })
+
+// task update validation
+export const updateTaskSchema = taskSchema.partial();

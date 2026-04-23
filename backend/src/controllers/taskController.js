@@ -4,10 +4,6 @@ import { taskSchema } from "../validators/validators.js";
 
 export const createTask = async (req, res) => {
     try {
-        const validate = taskSchema.safeParse(req.body);
-        if (!validate.success) {
-            return res.status(400).json({ error: validate.error.issues });
-        }
         const task = await Task.create({
             ...req.body,
             user_id: req.user.user_id
@@ -33,10 +29,6 @@ export const displayTasks = async (req, res) => {
 
 export const updateTask = async (req, res) => {
     try {
-        const validate = taskSchema.safeParse(req.body);
-        if (!validate.success) {
-            return res.status(400).json({ error: validate.error.issues });
-        }
         const existingTask = await Task.findOne({ _id: req.params.id, user_id: req.user.user_id });
         if (!existingTask) {
             return res.status(404).json({ error: "Task not found" });

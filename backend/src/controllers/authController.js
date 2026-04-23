@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 import User from "../models/User.js";
-import {userSchema, userLogin} from "../validators/validators.js";
 import { generateToken } from "../utils/generateToken.js";
 
 export const registerUser = async(req, res) => {
@@ -14,10 +13,6 @@ export const registerUser = async(req, res) => {
         const notUnique = await User.findOne({username});
         if(notUnique){
             return res.status(400).json({error: "Username has been used"});
-        }
-        const validate = userSchema.safeParse(req.body);
-        if(!validate.success){
-            return res.status(400).json({error: validate.error.issues});
         }
         const hashedPassword = await bcrypt.hash(req.body.password, 10);
         req.body.password = hashedPassword;
@@ -44,10 +39,6 @@ export const loginUser = async(req, res) => {
         const user = await User.findOne({email}).select("+password");
         if(!user){
             return res.status(400).json({error: "User not found"});
-        }
-        const validate = userLogin.safeParse(req.body);
-        if(!validate.success){
-            return res.status(400).json({error: validate.error.issues});
         }
         const isMatch = await bcrypt.compare(password, user.password);
         if(!isMatch){
