@@ -1,25 +1,22 @@
 import Stats from "../models/Stats.js"
 import Task from "../models/Task.js"
+import ApiError from "../utils/apiError.js";
 
 
 
 export const updateStats = async (req, res) => {
-    try {
-        const stats = await Stats.findById(req.body.stats_id);
-        if(!stats){
-            return res.status(400).json({error: "Stats not found"});
-        }
-        stats.total_completed += 1;
-        stats.tasks_completed.push(req.body.task_id);
-        await stats.save();
-        res.status(200).json({ stats });
-    } catch (error) {
-        res.status(500).json({error: error.message});
+    const stats = await Stats.findById(req.body.stats_id);
+    if(!stats){
+        throw new ApiError(404, "Stats not found");
     }
+    stats.total_completed += 1;
+    stats.tasks_completed.push(req.body.task_id);
+    await stats.save();
+    res.status(200).json({ stats });
+
 }
 
 export const getStats = async (req, res) => {
-    try {
         const user_id = req.user.user_id;
         const now = new Date();
 
@@ -37,7 +34,6 @@ export const getStats = async (req, res) => {
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         monthStart.setHours(0, 0, 0, 0);
 
-        // Use the actual completion timestamp, not updatedAt, so soft delete
         // does not move historical stats into a different day/week/month.
         const filterByDateRange = (tasks, startDate, endDate) => 
             tasks.filter(task => {
@@ -61,7 +57,4 @@ export const getStats = async (req, res) => {
             week: aggregateStats(weekTasks),
             month: aggregateStats(monthTasks)
         });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
 }

@@ -3,6 +3,7 @@ import { createTask, displayTasks, updateTask, deleteTask, addTime, addCycle, se
 import { validate } from "../middleware/validationMiddleware.js";
 import { protect } from "../middleware/authMiddleware.js";
 import { taskSchema } from "../validators/validators.js";
+import { asynHandler } from "../middleware/asyncMiddleware.js";
 const router = express.Router();
 
 router.get("/", (req, res) => {
