@@ -1,144 +1,274 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import api from '../api/api';
 
+const STORAGE_KEY = 'solostudy_active_pomodoro';
+const FOCUS_OPTIONS = [25, 50];
+const AUTOSAVE_SECONDS = 30;
+
+const getBreakMinutes = (focusMinutes) => (focusMinutes === 50 ? 10 : 5);
+
+const createSession = (task, focusMinutes = 25) => ({
+  task,
+  phase: 'focus',
+  status: 'idle',
+  focusMinutes,
+  durationSeconds: focusMinutes * 60,
+  elapsedBeforeStart: 0,
+  startedAt: null,
+  savedFocusSeconds: 0,
+  cyclesThisSession: 0,
+});
+
+const loadSession = () => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch {
+    return null;
+  }
+};
+
+const persistSession = (session) => {
+  if (!session?.task?._id) {
+    localStorage.removeItem(STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+};
+
+const getElapsedSeconds = (session, now = Date.now()) => {
+  if (!session) return 0;
+  if (session.status !== 'running' || !session.startedAt) {
+    return session.elapsedBeforeStart || 0;
+  }
+  const runningSeconds = Math.floor((now - session.startedAt) / 1000);
+  return Math.max(0, (session.elapsedBeforeStart || 0) + runningSeconds);
+};
+
 const PomodoroTimer = ({ selectedTask, onTaskRemove, onRefresh }) => {
-  const FOCUS_OPTIONS = [25, 50];
+  const [session, setSession] = useState(() => loadSession());
+  const [now, setNow] = useState(() => Date.now());
 
-  const [focusMinutes, setFocusMinutes] = useState(25);
-  const breakMinutes = focusMinutes === 50 ? 10 : 5;
+  const activeTask = selectedTask || session?.task || null;
 
-  const [timeRemaining, setTimeRemaining] = useState(25 * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [isBreak, setIsBreak] = useState(false);
-  const [, setUnsavedTime] = useState(0);
-  const [cyclesThisSession, setCyclesThisSession] = useState(0);
+  const elapsedSeconds = useMemo(() => getElapsedSeconds(session, now), [session, now]);
+  const totalSeconds = session?.durationSeconds || 25 * 60;
+  const timeRemaining = Math.max(totalSeconds - elapsedSeconds, 0);
+  const isRunning = session?.status === 'running';
+  const isBreak = session?.phase === 'break';
+  const focusMinutes = session?.focusMinutes || 25;
+  const cyclesThisSession = session?.cyclesThisSession || 0;
 
-  const intervalRef = useRef(null);
-  const unsavedTimeRef = useRef(0);
+  const saveFocusTime = useCallback(async (targetSession, elapsedOverride = null) => {
+    if (!targetSession?.task?._id || targetSession.phase !== 'focus') return targetSession;
 
-  const saveTime = useCallback(async (seconds) => {
-    if (!selectedTask || seconds <= 0) return;
-    try { 
-      await api.tasks.updateTimeElapsed({ id: selectedTask._id, time_elapsed: seconds }); 
-    }
-    catch (err) { console.error('Failed to save time:', err); }
-  }, [selectedTask]);
+    const currentElapsed = elapsedOverride ?? getElapsedSeconds(targetSession);
+    const cappedElapsed = Math.min(currentElapsed, targetSession.durationSeconds);
+    const unsavedSeconds = cappedElapsed - (targetSession.savedFocusSeconds || 0);
 
-  const clearUnsavedTime = useCallback(() => {
-    unsavedTimeRef.current = 0;
-    setUnsavedTime(0);
+    if (unsavedSeconds <= 0) return targetSession;
+
+    await api.tasks.updateTimeElapsed({
+      id: targetSession.task._id,
+      time_elapsed: unsavedSeconds,
+    });
+
+    return {
+      ...targetSession,
+      savedFocusSeconds: cappedElapsed,
+    };
   }, []);
 
-  const commitUnsavedTime = useCallback(async (shouldRefresh = true) => {
-    if (isBreak || unsavedTimeRef.current <= 0) return;
-    await saveTime(unsavedTimeRef.current);
-    clearUnsavedTime();
-    if (shouldRefresh) onRefresh();
-  }, [clearUnsavedTime, isBreak, onRefresh, saveTime]);
-
-  useEffect(() => {
-    return () => {
-      clearInterval(intervalRef.current);
-      clearUnsavedTime();
-    };
-  }, [selectedTask?._id, clearUnsavedTime]);
-
-  useEffect(() => {
-    clearInterval(intervalRef.current);
-    setIsRunning(false);
-    setIsBreak(false);
-    setTimeRemaining(focusMinutes * 60);
-    clearUnsavedTime();
-    setCyclesThisSession(0);
-  }, [selectedTask?._id, clearUnsavedTime, focusMinutes]);
-
-  const completeCycle = useCallback(async () => {
-    if (!selectedTask) return;
+  const finishFocus = useCallback(async (targetSession) => {
     try {
-      await commitUnsavedTime(false);
-      await api.tasks.addCycle({ id: selectedTask._id, cycles_completed: 1 });
-      setCyclesThisSession((p) => p + 1);
+      const savedSession = await saveFocusTime(targetSession, targetSession.durationSeconds);
+      await api.tasks.addCycle({ id: savedSession.task._id, cycles_completed: 1 });
+
+      const nextSession = {
+        ...savedSession,
+        task: {
+          ...savedSession.task,
+          time_elapsed: (savedSession.task.time_elapsed || 0) + targetSession.durationSeconds - (targetSession.savedFocusSeconds || 0),
+          cycles_completed: (savedSession.task.cycles_completed || 0) + 1,
+        },
+        phase: 'break',
+        status: 'idle',
+        durationSeconds: getBreakMinutes(savedSession.focusMinutes) * 60,
+        elapsedBeforeStart: 0,
+        startedAt: null,
+        savedFocusSeconds: 0,
+        cyclesThisSession: (savedSession.cyclesThisSession || 0) + 1,
+      };
+
+      setSession(nextSession);
+      persistSession(nextSession);
       onRefresh();
-    } catch (err) { console.error('Failed to complete cycle:', err); }
-  }, [commitUnsavedTime, selectedTask, onRefresh]);
+    } catch (err) {
+      console.error('Failed to complete focus cycle:', err);
+    }
+  }, [onRefresh, saveFocusTime]);
 
-  // Timer tick
+  const finishBreak = useCallback((targetSession) => {
+    const nextSession = {
+      ...targetSession,
+      phase: 'focus',
+      status: 'idle',
+      durationSeconds: targetSession.focusMinutes * 60,
+      elapsedBeforeStart: 0,
+      startedAt: null,
+      savedFocusSeconds: 0,
+    };
+
+    setSession(nextSession);
+    persistSession(nextSession);
+  }, []);
+
   useEffect(() => {
-    if (!isRunning) return;
-    intervalRef.current = setInterval(() => {
-      if (!isBreak) {
-        unsavedTimeRef.current += 1;
-        setUnsavedTime(unsavedTimeRef.current);
-      }
+    if (!selectedTask) return;
 
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          clearInterval(intervalRef.current);
-          setIsRunning(false);
-          if (!isBreak) {
-            completeCycle().then(() => {
-              setIsBreak(true);
-              setTimeRemaining(breakMinutes * 60);
-            });
-          } else {
-            setIsBreak(false);
-            setTimeRemaining(focusMinutes * 60);
-          }
-          return 0;
+    const timeoutId = setTimeout(() => {
+      setSession((current) => {
+        if (current?.task?._id === selectedTask._id) {
+          const updated = { ...current, task: selectedTask };
+          persistSession(updated);
+          return updated;
         }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(intervalRef.current);
-  }, [isRunning, isBreak, completeCycle, focusMinutes, breakMinutes]);
 
-  const handleStart = () => { if (selectedTask) setIsRunning(true); };
+        const nextSession = createSession(selectedTask, current?.focusMinutes || 25);
+        persistSession(nextSession);
+        return nextSession;
+      });
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [selectedTask]);
+
+  useEffect(() => {
+    persistSession(session);
+  }, [session]);
+
+  useEffect(() => {
+    if (!isRunning) return undefined;
+
+    const intervalId = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(intervalId);
+  }, [isRunning]);
+
+  useEffect(() => {
+    if (!session || !isRunning || timeRemaining > 0) return;
+
+    const timeoutId = setTimeout(() => {
+      if (session.phase === 'focus') {
+        finishFocus(session);
+      } else {
+        finishBreak(session);
+      }
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [finishBreak, finishFocus, isRunning, session, timeRemaining]);
+
+  useEffect(() => {
+    if (!session || session.phase !== 'focus' || !isRunning) return;
+
+    const unsavedSeconds = elapsedSeconds - (session.savedFocusSeconds || 0);
+    if (unsavedSeconds < AUTOSAVE_SECONDS) return;
+
+    let cancelled = false;
+    saveFocusTime(session, elapsedSeconds)
+      .then((savedSession) => {
+        if (cancelled) return;
+        setSession((current) => {
+          if (!current || current.task._id !== savedSession.task._id || current.phase !== savedSession.phase) {
+            return current;
+          }
+          return { ...current, savedFocusSeconds: savedSession.savedFocusSeconds };
+        });
+        onRefresh();
+      })
+      .catch((err) => console.error('Failed to autosave focus time:', err));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [elapsedSeconds, isRunning, onRefresh, saveFocusTime, session]);
+
+  const handleStart = () => {
+    if (!activeTask) return;
+
+    setSession((current) => {
+      const base = current?.task?._id === activeTask._id ? current : createSession(activeTask, focusMinutes);
+      const nextSession = {
+        ...base,
+        task: activeTask,
+        status: 'running',
+        startedAt: Date.now(),
+      };
+      persistSession(nextSession);
+      return nextSession;
+    });
+  };
 
   const handlePause = async () => {
-    setIsRunning(false);
-    clearInterval(intervalRef.current);
-    await commitUnsavedTime();
+    if (!session) return;
+
+    const currentElapsed = Math.min(getElapsedSeconds(session), session.durationSeconds);
+    let nextSession = {
+      ...session,
+      status: 'paused',
+      elapsedBeforeStart: currentElapsed,
+      startedAt: null,
+    };
+
+    try {
+      nextSession = await saveFocusTime(nextSession, currentElapsed);
+      onRefresh();
+    } catch (err) {
+      console.error('Failed to save paused time:', err);
+    }
+
+    setSession(nextSession);
+    persistSession(nextSession);
   };
 
   const handleReset = () => {
-    setIsRunning(false);
-    clearInterval(intervalRef.current);
-    setIsBreak(false);
-    setTimeRemaining(focusMinutes * 60);
-    clearUnsavedTime();
+    if (!activeTask) return;
+
+    const nextSession = {
+      ...createSession(activeTask, focusMinutes),
+      cyclesThisSession,
+    };
+    setSession(nextSession);
+    persistSession(nextSession);
   };
 
   const handleRemoveTask = () => {
-    setIsRunning(false);
-    clearInterval(intervalRef.current);
-    clearUnsavedTime();
+    setSession(null);
+    persistSession(null);
     onTaskRemove();
   };
 
   const handleFocusMinutesChange = (minutes) => {
-    setFocusMinutes(minutes);
-    setIsRunning(false);
-    clearInterval(intervalRef.current);
-    setIsBreak(false);
-    setTimeRemaining(minutes * 60);
-    clearUnsavedTime();
+    if (!activeTask) return;
+
+    const nextSession = createSession(activeTask, minutes);
+    setSession(nextSession);
+    persistSession(nextSession);
   };
 
   const minutes = Math.floor(timeRemaining / 60);
   const seconds = timeRemaining % 60;
-  const totalSeconds = isBreak ? breakMinutes * 60 : focusMinutes * 60;
   const progress = ((totalSeconds - timeRemaining) / totalSeconds) * 100;
   const circumference = 2 * Math.PI * 120;
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   return (
     <div className="glass-panel rounded-2xl overflow-hidden transition-all duration-300" id="pomodoro-timer">
-      {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b surface-divider">
         <h2 className="flex items-center gap-2 text-[15px] font-semibold theme-text-primary">
           <span>◷</span> Pomodoro
         </h2>
-        {selectedTask && (
+        {activeTask && (
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
             isBreak ? 'bg-green-500/20 text-white border-green-500/30' : 'status-pill'
           }`}>
@@ -147,9 +277,8 @@ const PomodoroTimer = ({ selectedTask, onTaskRemove, onRefresh }) => {
         )}
       </div>
 
-      {/* Body */}
       <div className="px-5 py-6 flex flex-col items-center">
-        {selectedTask ? (
+        {activeTask ? (
           <>
             <div className="mb-5 flex items-center gap-2 rounded-xl p-1 glass-ghost">
               {FOCUS_OPTIONS.map((minutesOption) => (
@@ -168,10 +297,9 @@ const PomodoroTimer = ({ selectedTask, onTaskRemove, onRefresh }) => {
               ))}
             </div>
 
-            {/* Task Info */}
             <div className="text-center mb-4">
               <span className="text-[10px] theme-text-soft uppercase tracking-widest">Working on</span>
-              <h3 className="text-lg font-semibold mt-1 mb-1.5 theme-text-primary">{selectedTask.title}</h3>
+              <h3 className="text-lg font-semibold mt-1 mb-1.5 theme-text-primary">{activeTask.title}</h3>
               <button
                 onClick={handleRemoveTask}
                 className="glass-ghost text-xs px-3 py-1 rounded-lg transition-all"
@@ -181,7 +309,6 @@ const PomodoroTimer = ({ selectedTask, onTaskRemove, onRefresh }) => {
               </button>
             </div>
 
-            {/* Timer Circle */}
             <div className="relative w-[220px] h-[220px] my-2 mb-5">
               <svg className="w-full h-full" viewBox="0 0 280 280">
                 <circle cx="140" cy="140" r="120" fill="none" strokeWidth="6" className="stroke-white/20" />
@@ -203,7 +330,6 @@ const PomodoroTimer = ({ selectedTask, onTaskRemove, onRefresh }) => {
               </div>
             </div>
 
-            {/* Controls */}
             <div className="flex gap-3 mb-5">
               {!isRunning ? (
                 <button
@@ -231,12 +357,11 @@ const PomodoroTimer = ({ selectedTask, onTaskRemove, onRefresh }) => {
               </button>
             </div>
 
-            {/* Session Stats */}
             <div className="flex gap-8 pt-4 border-t surface-divider w-full justify-center">
               {[
                 { value: cyclesThisSession, label: 'This Session' },
-                { value: selectedTask.cycles_completed, label: 'Total Cycles' },
-                { value: selectedTask.cycles_required, label: 'Target' },
+                { value: activeTask.cycles_completed, label: 'Total Cycles' },
+                { value: activeTask.cycles_required, label: 'Target' },
               ].map((s) => (
                 <div key={s.label} className="text-center">
                   <span className="block text-xl font-bold theme-text-primary">{s.value}</span>
