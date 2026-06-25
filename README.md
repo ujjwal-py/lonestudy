@@ -121,17 +121,21 @@ npm install
 
 3. Create `.env` file in backend root:
 ```env
+NODE_ENV=development
 MONGO_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret_key
 PORT=5000
+FRONTEND_URL=http://localhost:5173
 ```
 
 4. Start the server:
 ```bash
-npm start
+npm run dev
 ```
 
 Server runs on `http://localhost:5000`
+
+Use `NODE_ENV=development` while developing to print error stack traces in the backend console. Use `NODE_ENV=production` or `npm run prod` for production mode.
 
 ### Frontend Setup
 

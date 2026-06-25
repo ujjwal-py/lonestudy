@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon server.js"
+    "start": "node server.js",
+    "dev": "powershell -Command \"$env:NODE_ENV='development'; nodemon server.js\"",
+    "prod": "powershell -Command \"$env:NODE_ENV='production'; node server.js\""
   },
   "type": "module",
   "author": "",
